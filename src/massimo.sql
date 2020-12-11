@@ -6,7 +6,7 @@ set serveroutput on;
 
 /**
  * 2. Définir une procédure qui généra un texte initial de la newsletter en y ajoutant la liste de
- * toute les sortie de la semaine.
+ *    toute les sortie de la semaine.
  */
 create or replace procedure newsletter
 is
@@ -26,7 +26,7 @@ end;
 
 /**
  * 3. Générer la liste des vidéos populaires, conseillé pour un utilisateur, c’est à dire fonction des
- * catégories de vidéos qu’il suit.
+ *    catégories de vidéos qu’il suit.
  * 
  * Des suggestions de vidéos à regarder seront aussi générées. Elles seront basées uniquement sur la
  * popularité des vidéos par catégories. La popularité sera basée sur le nombre de visionnages au cours
@@ -85,28 +85,87 @@ begin
     select count(*) into nbfavs_v
     from favorite
     where idclient = :new.idclient;
-    
     if nbfavs_v >= 300 then
         raise_application_error(-20000, 'Nombre de favoris maximal atteint pour l''utilisateur ' ||  :new.idclient);
     end if;
 end;
 /
 
-create or replace procedure test_trigger_favs 
+create or replace procedure test_trigger_favs(idclient_v integer)
 is
 begin
     FOR i IN 100..399 LOOP
           insert into video values (i, 1, '../videos/path', to_char(i), 'desc', 32, 2000, SYSDATE-2,  SYSDATE+10, SYSDATE+12, 1, 'FR', '720p', 'AVI');
-          insert into favorite values (1, i);
-          commit;
+          insert into favorite values (idclient_v, i);
         END LOOP;
     insert into video values (400, 1, '../videos/path', '400', 'desc', 32, 2000, SYSDATE-2, SYSDATE+10, SYSDATE+12, 1, 'FR', '720p', 'AVI');
-    insert into favorite values (1, 400);    
-    commit;
+    insert into favorite values (idclient_v, 400);
 end;
 /
 
 begin
-    test_trigger_favs;
+    test_trigger_favs(1);
 end;
 /
+
+/**
+ * 2. Si une diffusion d’une émission est ajoutée, les dates de disponibilités seront mises à jour.
+ *    La nouvelle date de fin de disponibilité sera la date de la dernière diffusion plus 14 jours.
+ */
+ create or replace trigger end_availability_update
+ before insert or update of lastbroadcast on video
+ for each row
+ begin
+    :new.endavailability := :new.lastbroadcast + 14;
+ end;
+ /
+ 
+create or replace procedure test_trigger_availability(idvideo_v integer)
+is
+begin
+    update video 
+    set lastbroadcast = SYSDATE
+    where idvideo = idvideo_v;
+end;
+/
+
+begin
+    test_trigger_availability(1);
+end;
+/
+
+
+/**
+ * 4. Afin de limiter le spam de visionnage, un utilisateur ne pourra pas lancer plus de 3
+ *    visionnages par minutes. 
+ */
+create or replace trigger trigger_spam
+before insert on historical
+for each row
+declare
+nbviews_v integer;
+begin
+select count(*) into nbviews_v
+from historical
+where (idclient = :new.idclient) 
+    and :new.viewingdate >= (sysdate - interval '1' minute);
+if nbviews_v >= 3 then
+    raise_application_error(-20001, 'Nombre de visionnages lancés en 1 minutes maximal atteint pour l''utilisateur ' ||  :new.idclient);
+end if;
+end;
+/
+ 
+create or replace procedure test_trigger_spam(idclient_v integer)
+is
+begin
+    insert INTO historical VALUES (idclient_v, 1, SYSDATE);
+    insert INTO historical VALUES (idclient_v, 2, SYSDATE);
+    insert INTO historical VALUES (idclient_v, 3, SYSDATE);
+end;
+/
+
+begin
+    test_trigger_spam(1);
+end;
+ 
+ 
