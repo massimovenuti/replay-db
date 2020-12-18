@@ -68,10 +68,7 @@ BEGIN
 END;
 /
 
-BEGIN
-    video_2_json(1);
-END;
-/
+EXEC dbms_output.put_line(video_2_json(1));
 
 /**
  * 2. Définir une procédure qui généra un texte initial de la newsletter en y 
@@ -94,10 +91,7 @@ BEGIN
 END;
 /
 
-BEGIN
-    newsletter;
-END;
-/
+EXEC newsletter;
 
 /**
  * 3. Générer la liste des vidéos populaires, conseillé pour un utilisateur, 
@@ -151,7 +145,4 @@ BEGIN
 END;
 /
 
-BEGIN
-    reference(1);
-END;
-/
+EXEC reference(1);
